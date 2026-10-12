@@ -18,6 +18,8 @@ let cardsById = new Map()
 let activitiesById = new Map()
 let onlyWithDistance = false
 let onlyWithHeartrate = false
+let dateFrom = null
+let dateTo = null
 let lastClickedId = null
 let downloading = false
 
@@ -35,6 +37,9 @@ document.getElementById('selectAllButton').addEventListener('click', selectAllLo
 document.getElementById('clearButton').addEventListener('click', clearSelection);
 document.getElementById('distanceFilterButton').addEventListener('click', toggleDistanceFilter);
 document.getElementById('heartrateFilterButton').addEventListener('click', toggleHeartrateFilter);
+document.getElementById('dateFrom').addEventListener('change', updateDateFilter);
+document.getElementById('dateTo').addEventListener('change', updateDateFilter);
+document.getElementById('resetDatesButton').addEventListener('click', resetDateFilter);
 document.getElementById('downloadButton').addEventListener('click', downloadSelected);
 
 document.addEventListener('scroll', checkScrollPositionAndPreloadIfNecessary);
@@ -146,8 +151,8 @@ async function getActivities(loginResult){
 async function getNextBatchOfActivities(autoLoadIteration){
   document.getElementById('loading').hidden = false;
 
-  //todo: define the maximum range by date pickers, now it is set to 2015
-  newActivityResponse = await activity.getNextPageWithActivities(new Date(), new Date(2015,0));
+  // the "from" date limits how far back the activities are loaded, default is 2015
+  newActivityResponse = await activity.getNextPageWithActivities(new Date(), dateFrom || new Date(2015,0));
 
   var newActivities = newActivityResponse.activities;
 
@@ -277,6 +282,13 @@ function toggleSelection(id, range) {
  * @return {boolean} true if the activity has to be shown
  */
 function passesFilter(activity) {
+  var startTime = activity.startdate * 1000;
+  if (dateFrom && startTime < dateFrom.getTime()) {
+    return false;
+  }
+  if (dateTo && startTime >= dateTo.getTime()) {
+    return false;
+  }
   if (onlyWithDistance && !(activity.gps && activity.gps.distance > 0)) {
     return false;
   }
@@ -302,6 +314,32 @@ function toggleHeartrateFilter() {
   onlyWithHeartrate = !onlyWithHeartrate;
   document.getElementById('heartrateFilterButton').classList.toggle('active', onlyWithHeartrate);
   applyFilters();
+}
+
+/**
+ * Reads the "from" and "to" dates from the inputs. The "to" date is included,
+ * so the limit used for the comparison is the start of the next day.
+ */
+function updateDateFilter() {
+  var from = document.getElementById('dateFrom').value;
+  var to = document.getElementById('dateTo').value;
+
+  dateFrom = from ? new Date(from + 'T00:00:00') : null;
+  dateTo = null;
+  if (to) {
+    dateTo = new Date(to + 'T00:00:00');
+    dateTo.setDate(dateTo.getDate() + 1);
+  }
+  applyFilters();
+}
+
+/**
+ * Removes the "from" and "to" dates
+ */
+function resetDateFilter() {
+  document.getElementById('dateFrom').value = '';
+  document.getElementById('dateTo').value = '';
+  updateDateFilter();
 }
 
 /**
@@ -377,6 +415,7 @@ async function downloadSelected() {
   // keep the order of the list, oldest loaded last
   const toDownload = allActivities.filter(a => selectedIds.has(a.id));
   const failures = [];
+  const usedNames = new Set();
   let saved = 0;
 
   downloading = true;
@@ -386,7 +425,13 @@ async function downloadSelected() {
   for (let i = 0; i < toDownload.length; i++) {
     const selectedActivity = toDownload[i];
     const startDate = new Date(selectedActivity.startdate * 1000);
-    const fileName = 'activity_' + dateFormat(startDate, 'ddmmyyyy_HHMM') + '.gpx';
+    const baseName = 'activity_' + dateFormat(startDate, 'ddmmyyyy_HHMM');
+    // two activities that start in the same minute must not overwrite each other
+    let fileName = baseName + '.gpx';
+    for (let n = 2; usedNames.has(fileName); n++) {
+      fileName = baseName + '_' + n + '.gpx';
+    }
+    usedNames.add(fileName);
     document.getElementById('progressText').textContent =
       (i + 1) + ' of ' + toDownload.length + ': ' + fileName;
 

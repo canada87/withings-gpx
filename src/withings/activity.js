@@ -52,25 +52,27 @@ class Activity {
             }
         }
         
-        if (this.currentStartDate){
-            this.currentStartDate.setDate(this.currentStartDate.getDate()-30);
-        } else {
-            this.currentStartDate = startDate;
+        // the date down to which the activities have been fetched so far,
+        // endDate can change between calls (date filter), so it is not stored
+        if (!this.fetchedDownTo){
+            this.fetchedDownTo = new Date(startDate.getTime());
         }
 
-        if (this.currentStartDate < endDate) {
+        if (this.fetchedDownTo <= endDate) {
             return {
                 loading: false,
                 finished: true,
                 activities: []
             }
         }
-        let startDateMin30Days = new Date(this.currentStartDate.getTime());
-        startDateMin30Days.setDate(this.currentStartDate.getDate()-30);
+        let chunkEnd = new Date(this.fetchedDownTo.getTime());
+        let startDateMin30Days = new Date(chunkEnd.getTime());
+        startDateMin30Days.setDate(chunkEnd.getDate()-30);
         if(startDateMin30Days < endDate) {
-            startDateMin30Days = endDate;
+            startDateMin30Days = new Date(endDate.getTime());
         }
-        let activities = await this.getAllActivities(startDateMin30Days, this.currentStartDate)
+        let activities = await this.getAllActivities(startDateMin30Days, chunkEnd)
+        this.fetchedDownTo = startDateMin30Days;
         return {
             loading: false,
             finished: false,
@@ -117,8 +119,12 @@ class Activity {
             )
         })
 
-        let result = await promise;
-        return result;
+        try {
+            return await promise;
+        } finally {
+            // also after a failure, otherwise the next pages are never requested
+            this.isLoading = false;
+        }
     }
 
     /**
