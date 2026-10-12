@@ -54,12 +54,14 @@ jobs:
           node-version: 14
           cache: yarn
 
+      # --ignore-scripts: keytar must not be built for Node here (no prebuilt binary for
+      # Node 14 and node-gyp 5 cannot use the Visual Studio of the runner).
+      # electron-builder fetches the keytar prebuilt binaries for Electron 6 instead.
       - name: Install dependencies
         if: steps.version.outputs.build == 'true'
-        run: yarn install --frozen-lockfile
+        run: yarn install --frozen-lockfile --ignore-scripts
 
       # view/style.css is committed, so the less compilation is not repeated here.
-      # electron-builder rebuilds keytar for the bundled Electron version.
       - name: Build installer
         if: steps.version.outputs.build == 'true'
         run: npx electron-builder --win --x64 --ia32 -p never
