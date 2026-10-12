@@ -134,18 +134,105 @@ input {
      }
 }
 
+.overlay {
+    background: rgba(0, 0, 0, 0.6);
+    bottom: 0;
+    left: 0;
+    position: fixed;
+    right: 0;
+    top: 0;
+    z-index: 20;
+}
+
+.progress-text {
+    color: @text-color;
+    margin: 0px;
+    padding: 0.75em 1.5em;
+}
+
+.hint {
+    color: @subtext-color;
+    font-size: 0.8em;
+    margin: 0px;
+    padding: 0em 1.9em 0.5em;
+}
+
+.toolbar {
+    background: @dialog-color;
+    box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.5);
+    padding: 10px;
+    position: sticky;
+    text-align: right;
+    top: 0;
+    z-index: 10;
+
+    .btn {
+        margin-left: 6px;
+        padding: 0.5em 1em;
+    }
+
+    .btn:disabled {
+        cursor: default;
+        opacity: 0.4;
+    }
+}
+
+.selection-count {
+    color: @text-color;
+    float: left;
+    line-height: 2.2em;
+    padding-left: 10px;
+}
+
+.btn-secondary {
+    background: transparent;
+    border-color: @input-bottom-border;
+}
+
 .activities {
     & > div {
         background-color: @dialog-color;
+        border-left: 4px solid transparent;
         box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.25);
         color: @text-color;
         cursor: pointer;
         font-size: 0.8em;
         margin: 10px;
         padding: 20px;
+        user-select: none;
 
         &:hover {
             background-color: @activities-hover-color;
+        }
+
+        &.selected {
+            border-left-color: @btn-background-color;
+        }
+
+        .check {
+            border: 1px solid @subtext-color;
+            border-radius: 3px;
+            display: inline-block;
+            height: 16px;
+            margin-right: 10px;
+            vertical-align: -2px;
+            width: 16px;
+        }
+
+        &.selected .check {
+            background: @btn-background-color;
+            border-color: @btn-background-color;
+        }
+
+        &.selected .check::after {
+            border-bottom: 2px solid @btn-text-color;
+            border-right: 2px solid @btn-text-color;
+            content: '';
+            display: block;
+            height: 8px;
+            margin: 1px 0px 0px 5px;
+            transform: rotate(45deg);
+            width: 4px;
         }
     }
 }

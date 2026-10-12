@@ -4,6 +4,7 @@ const Activity = require('../src/withings/activity.js')
 const GpxGenerator = require('../src/gpxgenerator.js')
 const dateFormat = require('dateformat');
 const fs = require('fs')
+const path = require('path')
 const Preferences = require('../src/preferences')
 
 let login = new Login()
@@ -12,6 +13,10 @@ let activity = new Activity()
 let accountResult = {}
 let loginResult = {}
 let allActivities = []
+let selectedIds = new Set()
+let cardsById = new Map()
+let lastClickedId = null
+let downloading = false
 
 let SERVICE_NAME = 'Withings-GPX';
 let loginButton = document.getElementById('loginButton');
@@ -23,6 +28,9 @@ require('electron').ipcRenderer.on('logout', logout)
 loginButton.addEventListener('click', startLogin);
 emailInputField.addEventListener('keypress', checkKeyAndLogin);
 passwordInputField.addEventListener('keypress', checkKeyAndLogin);
+document.getElementById('selectAllButton').addEventListener('click', selectAllLoaded);
+document.getElementById('clearButton').addEventListener('click', clearSelection);
+document.getElementById('downloadButton').addEventListener('click', downloadSelected);
 
 document.addEventListener('scroll', checkScrollPositionAndPreloadIfNecessary);
 
@@ -174,14 +182,11 @@ function renderActivities(allActivities){
   
   allActivities.forEach(function(activity){
     var newDiv = renderActivityDiv(activity);
-    newDiv.addEventListener('click', function(){
-      var selectedActivity = allActivities
-                              .filter(a => a.id === Number(newDiv.dataset.activityId))[0];
-      generateGpx(selectedActivity);
-      hideAllPanels();
-      document.getElementById('processing').hidden = false;
+    newDiv.addEventListener('click', function(event){
+      toggleSelection(activity.id, event.shiftKey);
     })
 
+    cardsById.set(activity.id, newDiv);
     activityDiv.appendChild(newDiv)
   });
 
@@ -196,10 +201,10 @@ function renderActivities(allActivities){
 function renderActivityDiv(activity) {
   var newDiv = document.createElement('div');
   let startDate = new Date(activity.startdate * 1000);
-  newDiv.innerHTML = '<h3>Activity started on ' 
-                      + dateFormat(startDate, 'dd mm yyyy') 
-                      + ' at ' 
-                      + dateFormat(startDate, 'HH:MM') + ' <h3>';
+  newDiv.innerHTML = '<h3><span class="check"></span>Activity started on '
+                      + dateFormat(startDate, 'dd mm yyyy')
+                      + ' at '
+                      + dateFormat(startDate, 'HH:MM') + ' </h3>';
   newDiv.innerHTML += '<div class="info maxheartrate"><div class="label">'
                       + 'average HR</div><div class="value">' 
                       + activity.data.hr_average 
@@ -221,40 +226,133 @@ function renderActivityDiv(activity) {
 }
 
 /**
- * Generates a GPX file and opens the save dialog
- * @param {Activity} selectedActivity 
+ * Selects or deselects a single activity card
+ * @param {number} id the activity id
+ * @param {boolean} selected whether the activity should be selected
  */
-async function generateGpx(selectedActivity){
-  let gpxContent = await (new GpxGenerator())
-                    .generateGpxFromActivity(selectedActivity)
-  let startDate = new Date(selectedActivity.startdate*1000);
-  var fileName = 'activity_' 
-                + dateFormat(startDate, 'ddmmyyyy_HHMM') 
-                + '.gpx'
+function setSelected(id, selected) {
+  var card = cardsById.get(id);
+  if (!card) {
+    return;
+  }
+  if (selected) {
+    selectedIds.add(id);
+  } else {
+    selectedIds.delete(id);
+  }
+  card.classList.toggle('selected', selected);
+}
 
-  const { dialog, app }  = require('electron').remote
+/**
+ * Toggles the selection of an activity. With shift pressed, every activity
+ * between the last clicked one and this one gets the same state.
+ * @param {number} id the activity id
+ * @param {boolean} range true if a range should be (de)selected
+ */
+function toggleSelection(id, range) {
+  var select = !selectedIds.has(id);
+  var ids = Array.from(cardsById.keys());
 
-  const preferences = new Preferences()
+  if (range && lastClickedId !== null && ids.includes(lastClickedId)) {
+    var bounds = [ids.indexOf(lastClickedId), ids.indexOf(id)].sort((a, b) => a - b);
+    ids.slice(bounds[0], bounds[1] + 1).forEach(i => setSelected(i, select));
+  } else {
+    setSelected(id, select);
+  }
 
+  lastClickedId = id;
+  updateToolbar();
+}
+
+/**
+ * Selects all the activities that have been loaded so far
+ */
+function selectAllLoaded() {
+  cardsById.forEach((card, id) => setSelected(id, true));
+  updateToolbar();
+}
+
+/**
+ * Deselects all the activities
+ */
+function clearSelection() {
+  cardsById.forEach((card, id) => setSelected(id, false));
+  lastClickedId = null;
+  updateToolbar();
+}
+
+/**
+ * Updates the selection counter and the state of the toolbar buttons
+ */
+function updateToolbar() {
+  document.getElementById('selectionCount').textContent = selectedIds.size + ' selected';
+  document.getElementById('downloadButton').disabled = selectedIds.size === 0 || downloading;
+  document.getElementById('clearButton').disabled = selectedIds.size === 0;
+}
+
+/**
+ * Asks for a destination folder and saves a GPX file for every selected activity.
+ * The activity list stays in place, so the scroll position is not lost.
+ */
+async function downloadSelected() {
+  if (downloading || selectedIds.size === 0) {
+    return;
+  }
+
+  const { dialog, app } = require('electron').remote;
+  const preferences = new Preferences();
   const lastSaveDir = await preferences.getLastSaveDir();
 
-  const options = {
-      defaultPath: (lastSaveDir ? lastSaveDir : app.getPath('documents')) + '/' + fileName,
+  const { canceled, filePaths } = await dialog.showOpenDialog(null, {
+    title: 'Choose the folder where the GPX files will be saved',
+    defaultPath: typeof lastSaveDir === 'string' ? lastSaveDir : app.getPath('documents'),
+    properties: ['openDirectory', 'createDirectory']
+  });
+  if (canceled || !filePaths || filePaths.length === 0) {
+    return;
+  }
+  const targetDir = filePaths[0];
+
+  // keep the order of the list, oldest loaded last
+  const toDownload = allActivities.filter(a => selectedIds.has(a.id));
+  const failures = [];
+  let saved = 0;
+
+  downloading = true;
+  updateToolbar();
+  document.getElementById('processing').hidden = false;
+
+  for (let i = 0; i < toDownload.length; i++) {
+    const selectedActivity = toDownload[i];
+    const startDate = new Date(selectedActivity.startdate * 1000);
+    const fileName = 'activity_' + dateFormat(startDate, 'ddmmyyyy_HHMM') + '.gpx';
+    document.getElementById('progressText').textContent =
+      (i + 1) + ' of ' + toDownload.length + ': ' + fileName;
+
+    try {
+      const gpxContent = await (new GpxGenerator())
+                          .generateGpxFromActivity(selectedActivity);
+      fs.writeFileSync(path.join(targetDir, fileName), gpxContent, 'utf-8');
+      setSelected(selectedActivity.id, false);
+      saved++;
+    } catch (e) {
+      failures.push(fileName + ': ' + e);
+    }
   }
 
-  const { filePath } = await dialog.showSaveDialog(null, options);
+  document.getElementById('processing').hidden = true;
+  downloading = false;
+  updateToolbar();
 
-  if( filePath ){
-      try{
-          fs.writeFileSync(filePath, gpxContent, 'utf-8');
-
-          await preferences.updateLastSaveDir(filePath);
-      }catch(e){
-          alert('failed to save the file: ' + e);
-      }
+  if (saved > 0) {
+    await preferences.updateLastSaveDir(path.join(targetDir, 'x'));
   }
-  hideAllPanels();
-  document.getElementById('activitiesDialog').hidden = false;
+
+  var message = saved + ' of ' + toDownload.length + ' files saved in ' + targetDir;
+  if (failures.length > 0) {
+    message += '\n\nFailed (still selected, you can retry):\n' + failures.join('\n');
+  }
+  alert(message);
 }
 
 startAutoLogin();

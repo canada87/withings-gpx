@@ -1,0 +1,46 @@
+name: Release
+
+# Builds the Windows installer when a version tag (e.g. v0.2.0) is pushed
+# and attaches it to the GitHub Release for that tag.
+# It can also be started by hand from the Actions tab (workflow_dispatch):
+# in that case the installer is only saved as a workflow artifact.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Electron 6 and keytar 4 need an old Node to build the native module
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 14
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      # view/style.css is committed, so the less compilation is not repeated here.
+      # electron-builder rebuilds keytar for the bundled Electron version.
+      - name: Build installer
+        run: npx electron-builder --win --x64 --ia32 -p never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: dist/*.exe
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.exe
+          generate_release_notes: true

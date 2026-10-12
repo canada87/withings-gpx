@@ -15,9 +15,9 @@ More information here: [https://support.withings.com/hc/en-us/articles/360036851
 
 ## Download installers
 
-[macOS v0.1.5 alpha](https://github.com/vertongen/withings-gpx/releases/download/v0.1.5-alpha/Withings.gpx.export-0.1.5.dmg) 
+[macOS v0.1.5 alpha (original version, without bulk download)](https://github.com/vertongen/withings-gpx/releases/download/v0.1.5-alpha/Withings.gpx.export-0.1.5.dmg) 
 
-[Windows 64bit & 32bit v0.1.5 alpha](https://github.com/vertongen/withings-gpx/releases/download/v0.1.5-alpha/Withings.gpx.export.Setup.0.1.5.exe)
+[Windows 64bit & 32bit - latest release](https://github.com/canada87/withings-gpx/releases/latest) (includes bulk selection and download of activities)
 
 ## To Use
 
@@ -25,7 +25,7 @@ To clone and run this repository you’ll need [Git](https://git-scm.com/), [Nod
 
 ```bash
 # Clone this repository
-git clone https://github.com/vertongen/withings-gpx.git
+git clone https://github.com/canada87/withings-gpx.git
 # Go into the repository
 cd withings-gpx
 # Install dependencies
