@@ -17,6 +17,7 @@ let selectedIds = new Set()
 let cardsById = new Map()
 let activitiesById = new Map()
 let onlyWithDistance = false
+let onlyWithHeartrate = false
 let lastClickedId = null
 let downloading = false
 
@@ -33,6 +34,7 @@ passwordInputField.addEventListener('keypress', checkKeyAndLogin);
 document.getElementById('selectAllButton').addEventListener('click', selectAllLoaded);
 document.getElementById('clearButton').addEventListener('click', clearSelection);
 document.getElementById('distanceFilterButton').addEventListener('click', toggleDistanceFilter);
+document.getElementById('heartrateFilterButton').addEventListener('click', toggleHeartrateFilter);
 document.getElementById('downloadButton').addEventListener('click', downloadSelected);
 
 document.addEventListener('scroll', checkScrollPositionAndPreloadIfNecessary);
@@ -275,20 +277,39 @@ function toggleSelection(id, range) {
  * @return {boolean} true if the activity has to be shown
  */
 function passesFilter(activity) {
-  if (onlyWithDistance) {
-    return !!activity.gps && activity.gps.distance > 0;
+  if (onlyWithDistance && !(activity.gps && activity.gps.distance > 0)) {
+    return false;
+  }
+  if (onlyWithHeartrate && !(activity.data && activity.data.hr_average > 0)) {
+    return false;
   }
   return true;
 }
 
 /**
- * Turns the "distance > 0" filter on or off. Activities that become hidden are
- * deselected, so a download never includes something that is not visible.
+ * Turns the "distance > 0" filter on or off
  */
 function toggleDistanceFilter() {
   onlyWithDistance = !onlyWithDistance;
   document.getElementById('distanceFilterButton').classList.toggle('active', onlyWithDistance);
+  applyFilters();
+}
 
+/**
+ * Turns the "average HR > 0" filter on or off
+ */
+function toggleHeartrateFilter() {
+  onlyWithHeartrate = !onlyWithHeartrate;
+  document.getElementById('heartrateFilterButton').classList.toggle('active', onlyWithHeartrate);
+  applyFilters();
+}
+
+/**
+ * Shows only the activities that pass all the active filters. Activities that
+ * become hidden are deselected, so a download never includes something that is
+ * not visible.
+ */
+function applyFilters() {
   cardsById.forEach((card, id) => {
     card.hidden = !passesFilter(activitiesById.get(id));
     if (card.hidden) {
