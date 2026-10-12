@@ -101,7 +101,7 @@ class Activity {
             new Api().post('/cgi-bin/v2/activity', requestBody).then(
                 function(body){
                     if(body.status > 0) {
-                        return reject(new Error('Server error'));
+                        return reject(new Error('Server error (status ' + body.status + ')'));
                     }
                     
                     var activitiesToSelectfrom = 
@@ -112,7 +112,7 @@ class Activity {
                     that.isLoading = false;
                 }, 
                 function(error){
-                    return reject(new Error('Server error'));
+                    return reject(new Error('Server error (' + error.message + ')'));
                 }
             )
         })
@@ -147,12 +147,12 @@ class Activity {
             new Api().post('/cgi-bin/v2/measure', requestBody).then(
                 function(body){
                     if(body.status > 0) {
-                        return reject(new Error('Server error'));
+                        return reject(new Error('Server error (status ' + body.status + ')'));
                     }
                     resolve(body.body.series[0])
                 }, 
                 function(error){
-                    return reject(new Error('Server error'));
+                    return reject(new Error('Server error (' + error.message + ')'));
                 }
             )
         })
@@ -187,12 +187,12 @@ class Activity {
             new Api().post('/cgi-bin/v2/measure', requestBody).then(
                 function(body){
                     if(body.status > 0) {
-                        return reject(new Error('Server error'));
+                        return reject(new Error('Server error (status ' + body.status + ')'));
                     }
                     resolve(body.body.series[0])
                 }, 
                 function(error){
-                    return reject(new Error('Server error'));
+                    return reject(new Error('Server error (' + error.message + ')'));
                 }
             )
         })
