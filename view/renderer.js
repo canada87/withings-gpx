@@ -15,6 +15,8 @@ let loginResult = {}
 let allActivities = []
 let selectedIds = new Set()
 let cardsById = new Map()
+let activitiesById = new Map()
+let onlyWithDistance = false
 let lastClickedId = null
 let downloading = false
 
@@ -30,6 +32,7 @@ emailInputField.addEventListener('keypress', checkKeyAndLogin);
 passwordInputField.addEventListener('keypress', checkKeyAndLogin);
 document.getElementById('selectAllButton').addEventListener('click', selectAllLoaded);
 document.getElementById('clearButton').addEventListener('click', clearSelection);
+document.getElementById('distanceFilterButton').addEventListener('click', toggleDistanceFilter);
 document.getElementById('downloadButton').addEventListener('click', downloadSelected);
 
 document.addEventListener('scroll', checkScrollPositionAndPreloadIfNecessary);
@@ -187,6 +190,8 @@ function renderActivities(allActivities){
     })
 
     cardsById.set(activity.id, newDiv);
+    activitiesById.set(activity.id, activity);
+    newDiv.hidden = !passesFilter(activity);
     activityDiv.appendChild(newDiv)
   });
 
@@ -251,7 +256,7 @@ function setSelected(id, selected) {
  */
 function toggleSelection(id, range) {
   var select = !selectedIds.has(id);
-  var ids = Array.from(cardsById.keys());
+  var ids = Array.from(cardsById.keys()).filter(i => !cardsById.get(i).hidden);
 
   if (range && lastClickedId !== null && ids.includes(lastClickedId)) {
     var bounds = [ids.indexOf(lastClickedId), ids.indexOf(id)].sort((a, b) => a - b);
@@ -265,10 +270,45 @@ function toggleSelection(id, range) {
 }
 
 /**
- * Selects all the activities that have been loaded so far
+ * Checks if an activity is shown with the current filters
+ * @param {Activity} activity a single activity
+ * @return {boolean} true if the activity has to be shown
+ */
+function passesFilter(activity) {
+  if (onlyWithDistance) {
+    return !!activity.gps && activity.gps.distance > 0;
+  }
+  return true;
+}
+
+/**
+ * Turns the "distance > 0" filter on or off. Activities that become hidden are
+ * deselected, so a download never includes something that is not visible.
+ */
+function toggleDistanceFilter() {
+  onlyWithDistance = !onlyWithDistance;
+  document.getElementById('distanceFilterButton').classList.toggle('active', onlyWithDistance);
+
+  cardsById.forEach((card, id) => {
+    card.hidden = !passesFilter(activitiesById.get(id));
+    if (card.hidden) {
+      setSelected(id, false);
+    }
+  });
+  if (lastClickedId !== null && cardsById.get(lastClickedId).hidden) {
+    lastClickedId = null;
+  }
+
+  updateToolbar();
+  // fewer cards may leave too little to scroll, so the next batch has to be requested
+  checkScrollPositionAndPreloadIfNecessary();
+}
+
+/**
+ * Selects all the activities that are currently shown
  */
 function selectAllLoaded() {
-  cardsById.forEach((card, id) => setSelected(id, true));
+  cardsById.forEach((card, id) => setSelected(id, !card.hidden));
   updateToolbar();
 }
 

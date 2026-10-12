@@ -152,6 +152,10 @@ input:focus {
   background: transparent;
   border-color: #606060;
 }
+.btn-secondary.active {
+  background: #008cff;
+  border-color: #027fe8;
+}
 .activities > div {
   background-color: #0f0f0f;
   border-left: 4px solid transparent;
