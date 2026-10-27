@@ -20,6 +20,7 @@ let onlyWithDistance = false
 let onlyWithHeartrate = false
 let dateFrom = null
 let dateTo = null
+let fullHeartrateTimeline = true
 let lastClickedId = null
 let downloading = false
 
@@ -40,6 +41,7 @@ document.getElementById('heartrateFilterButton').addEventListener('click', toggl
 document.getElementById('dateFrom').addEventListener('change', updateDateFilter);
 document.getElementById('dateTo').addEventListener('change', updateDateFilter);
 document.getElementById('resetDatesButton').addEventListener('click', resetDateFilter);
+document.getElementById('hrTimelineButton').addEventListener('click', toggleHeartrateTimeline);
 document.getElementById('downloadButton').addEventListener('click', downloadSelected);
 
 document.addEventListener('scroll', checkScrollPositionAndPreloadIfNecessary);
@@ -334,6 +336,16 @@ function updateDateFilter() {
 }
 
 /**
+ * Switches between the two ways of generating the GPX file:
+ * on = every heartrate sample is exported, even without a close location sample;
+ * off = the original way, only the location samples are exported
+ */
+function toggleHeartrateTimeline() {
+  fullHeartrateTimeline = !fullHeartrateTimeline;
+  document.getElementById('hrTimelineButton').classList.toggle('active', fullHeartrateTimeline);
+}
+
+/**
  * Removes the "from" and "to" dates
  */
 function resetDateFilter() {
@@ -437,7 +449,7 @@ async function downloadSelected() {
 
     try {
       const gpxContent = await (new GpxGenerator())
-                          .generateGpxFromActivity(selectedActivity);
+                          .generateGpxFromActivity(selectedActivity, fullHeartrateTimeline);
       fs.writeFileSync(path.join(targetDir, fileName), gpxContent, 'utf-8');
       setSelected(selectedActivity.id, false);
       saved++;

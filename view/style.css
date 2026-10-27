@@ -152,6 +152,10 @@ input:focus {
 .toolbar .filter-row .btn {
   margin-left: 0px;
 }
+.toolbar .filter-row #hrTimelineButton {
+  float: right;
+  margin-right: 10px;
+}
 .toolbar .date-input {
   background: #0f0f0f;
   border: 1px solid #606060;
