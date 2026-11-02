@@ -139,6 +139,86 @@ class GpxGenerator {
     }
 
     /**
+     * Fetches the details of the activity and generates the file to export.
+     * Activities with location data become a GPX file. Activities without any
+     * location data (e.g. indoor workouts) cannot be a GPX file, because GPX needs a
+     * position in every point, so they become a TCX file that only has the heartrate.
+     * @param {Activity} selectedActivity the activity received from allActivities
+     * @param {boolean} fullHeartrateTimeline see generateGpxFromActivity
+     * @param {string} sport Biking, Running or Other, only used for the TCX file
+     * @return {object} with the content of the file and its extension (gpx or tcx)
+     */
+    async generateFromActivity(selectedActivity, fullHeartrateTimeline, sport){
+        console.log(selectedActivity);
+        let heartrateData = await activity
+                            .getHeartrateData(selectedActivity.startdate, selectedActivity.enddate);
+        let locationData = await activity
+                            .getLocationData(selectedActivity.startdate, selectedActivity.enddate);
+        let startDate = new Date(selectedActivity.startdate * 1000);
+        let name = 'Withings activity ' + dateFormat(startDate, 'yyyy-mm-dd HH:MM');
+
+        if(locationData && locationData.vasistas && locationData.vasistas.length > 0){
+            return {
+                content: this.generateGpx(locationData, heartrateData, name, fullHeartrateTimeline),
+                extension: 'gpx'
+            };
+        }
+        return {
+            content: this.generateTcx(selectedActivity, heartrateData, sport),
+            extension: 'tcx'
+        };
+    }
+
+    /**
+     * This method generates a TCX file with the heartrate samples and without positions
+     * @param {Activity} selectedActivity the activity received from allActivities
+     * @param {object} heartrateData The heartrate data received from withings
+     * @param {string} sport Biking, Running or Other
+     * @return {string} contents of the TCX file
+     */
+    generateTcx(selectedActivity, heartrateData, sport){
+        var samples = [];
+        if(heartrateData && heartrateData.vasistas){
+            for(var i = 0; i < heartrateData.dates.length; i++){
+                let value = heartrateData.vasistas[i][0];
+                if(value > 0){
+                    samples.push({timestamp: heartrateData.dates[i], heartrate: Math.round(value)});
+                }
+            }
+        }
+        if(samples.length === 0){
+            throw new Error('No GPS and no heart rate data available for this activity');
+        }
+        samples.sort((a, b) => a.timestamp - b.timestamp);
+
+        var sportName = ['Biking', 'Running', 'Other'].includes(sport) ? sport : 'Other';
+        var data = selectedActivity.data || {};
+        var calories = [data.calories, data.manual_calories]
+                        .find(v => typeof v === 'number' && v > 0) || 0;
+        var startIso = new Date(selectedActivity.startdate * 1000).toISOString();
+        var duration = Math.max(0, selectedActivity.enddate - selectedActivity.startdate);
+        var heartrates = samples.map(s => s.heartrate);
+        var average = Math.round(heartrates.reduce((a, b) => a + b, 0) / heartrates.length);
+        var maximum = Math.max.apply(null, heartrates);
+
+        var result = '<?xml version="1.0" encoding="UTF-8"?><TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2"><Activities>';
+        result += '<Activity Sport="' + sportName + '"><Id>' + startIso + '</Id>';
+        result += '<Lap StartTime="' + startIso + '">';
+        result += '<TotalTimeSeconds>' + duration + '</TotalTimeSeconds>';
+        result += '<DistanceMeters>0</DistanceMeters>';
+        result += '<Calories>' + Math.round(calories) + '</Calories>';
+        result += '<AverageHeartRateBpm><Value>' + average + '</Value></AverageHeartRateBpm>';
+        result += '<MaximumHeartRateBpm><Value>' + maximum + '</Value></MaximumHeartRateBpm>';
+        result += '<Intensity>Active</Intensity><TriggerMethod>Manual</TriggerMethod><Track>';
+        samples.forEach(function(sample){
+            result += '<Trackpoint><Time>' + new Date(sample.timestamp * 1000).toISOString() + '</Time>';
+            result += '<HeartRateBpm><Value>' + sample.heartrate + '</Value></HeartRateBpm></Trackpoint>';
+        });
+        result += '</Track></Lap></Activity></Activities></TrainingCenterDatabase>';
+        return result;
+    }
+
+    /**
      * Escapes the characters that are not allowed in XML text
      * @param {string} text the text to escape
      * @return {string} the escaped text

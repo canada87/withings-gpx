@@ -27,7 +27,14 @@
           <label>From <input type="date" id="dateFrom" class="date-input"></label>
           <label>To <input type="date" id="dateTo" class="date-input"></label>
           <button type="button" id="resetDatesButton" class="btn btn-secondary">Reset dates</button>
-          <button type="button" id="noGpsButton" class="btn btn-secondary" title="Also list the activities that have no GPS data at all. They cannot be exported to GPX.">Show without GPS</button>
+          <button type="button" id="noGpsButton" class="btn btn-secondary" title="Also list the activities that have no GPS data at all. They are exported as a .tcx file with the heart rate only.">Show without GPS</button>
+          <label class="sport-label">Sport (no GPS)
+            <select id="noGpsSport" class="sport-select">
+              <option value="Biking" selected>Biking</option>
+              <option value="Running">Running</option>
+              <option value="Other">Other</option>
+            </select>
+          </label>
           <button type="button" id="hrTimelineButton" class="btn btn-secondary active" title="On: every heartrate sample is exported, also without GPS movement (e.g. indoor cycling). Off: original mode, only GPS points are exported.">Full HR timeline</button>
         </div>
       </div>

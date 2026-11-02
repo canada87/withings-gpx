@@ -22,6 +22,7 @@ let dateFrom = null
 let dateTo = null
 let fullHeartrateTimeline = true
 let showWithoutGps = false
+let noGpsSport = 'Biking'
 let lastClickedId = null
 let downloading = false
 
@@ -44,6 +45,9 @@ document.getElementById('dateTo').addEventListener('change', updateDateFilter);
 document.getElementById('resetDatesButton').addEventListener('click', resetDateFilter);
 document.getElementById('hrTimelineButton').addEventListener('click', toggleHeartrateTimeline);
 document.getElementById('noGpsButton').addEventListener('click', toggleNoGps);
+document.getElementById('noGpsSport').addEventListener('change', function(event){
+  noGpsSport = event.target.value;
+});
 document.getElementById('downloadButton').addEventListener('click', downloadSelected);
 
 document.addEventListener('scroll', checkScrollPositionAndPreloadIfNecessary);
@@ -464,23 +468,24 @@ async function downloadSelected() {
     const selectedActivity = toDownload[i];
     const startDate = new Date(selectedActivity.startdate * 1000);
     const baseName = 'activity_' + dateFormat(startDate, 'ddmmyyyy_HHMM');
-    // two activities that start in the same minute must not overwrite each other
-    let fileName = baseName + '.gpx';
-    for (let n = 2; usedNames.has(fileName); n++) {
-      fileName = baseName + '_' + n + '.gpx';
-    }
-    usedNames.add(fileName);
     document.getElementById('progressText').textContent =
-      (i + 1) + ' of ' + toDownload.length + ': ' + fileName;
+      (i + 1) + ' of ' + toDownload.length + ': ' + baseName;
 
     try {
-      const gpxContent = await (new GpxGenerator())
-                          .generateGpxFromActivity(selectedActivity, fullHeartrateTimeline);
-      fs.writeFileSync(path.join(targetDir, fileName), gpxContent, 'utf-8');
+      // activities with GPS become a .gpx file, the ones without GPS a .tcx file
+      const exported = await (new GpxGenerator())
+                        .generateFromActivity(selectedActivity, fullHeartrateTimeline, noGpsSport);
+      // two activities that start in the same minute must not overwrite each other
+      let fileName = baseName + '.' + exported.extension;
+      for (let n = 2; usedNames.has(fileName); n++) {
+        fileName = baseName + '_' + n + '.' + exported.extension;
+      }
+      usedNames.add(fileName);
+      fs.writeFileSync(path.join(targetDir, fileName), exported.content, 'utf-8');
       setSelected(selectedActivity.id, false);
       saved++;
     } catch (e) {
-      failures.push(fileName + ': ' + e);
+      failures.push(baseName + ': ' + e);
     }
   }
 

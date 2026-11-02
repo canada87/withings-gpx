@@ -170,6 +170,17 @@ input:focus {
   padding: 0.3em 0.5em;
   width: auto;
 }
+.toolbar .sport-select {
+  background: #0f0f0f;
+  border: 1px solid #606060;
+  border-radius: 4px;
+  color: #e6e6e6;
+  margin: 0px 0px 0px 6px;
+  padding: 0.3em 0.5em;
+}
+.toolbar .sport-label {
+  margin-left: 16px;
+}
 .selection-count {
   color: #e6e6e6;
   float: left;
