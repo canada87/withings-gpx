@@ -108,7 +108,6 @@ class Activity {
                     
                     var activitiesToSelectfrom = 
                         body.body.series
-                                    .filter(a => a.gps !== null)
                                     .sort((a,b) => b.startdate - a.startdate);
                     resolve(activitiesToSelectfrom)
                     that.isLoading = false;

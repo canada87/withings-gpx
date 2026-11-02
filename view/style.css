@@ -152,6 +152,9 @@ input:focus {
 .toolbar .filter-row .btn {
   margin-left: 0px;
 }
+.toolbar .filter-row #noGpsButton {
+  margin-left: 6px;
+}
 .toolbar .filter-row #hrTimelineButton {
   float: right;
   margin-right: 10px;

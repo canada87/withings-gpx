@@ -21,6 +21,7 @@ let onlyWithHeartrate = false
 let dateFrom = null
 let dateTo = null
 let fullHeartrateTimeline = true
+let showWithoutGps = false
 let lastClickedId = null
 let downloading = false
 
@@ -42,6 +43,7 @@ document.getElementById('dateFrom').addEventListener('change', updateDateFilter)
 document.getElementById('dateTo').addEventListener('change', updateDateFilter);
 document.getElementById('resetDatesButton').addEventListener('click', resetDateFilter);
 document.getElementById('hrTimelineButton').addEventListener('click', toggleHeartrateTimeline);
+document.getElementById('noGpsButton').addEventListener('click', toggleNoGps);
 document.getElementById('downloadButton').addEventListener('click', downloadSelected);
 
 document.addEventListener('scroll', checkScrollPositionAndPreloadIfNecessary);
@@ -215,28 +217,40 @@ function renderActivities(allActivities){
 function renderActivityDiv(activity) {
   var newDiv = document.createElement('div');
   let startDate = new Date(activity.startdate * 1000);
+  let data = activity.data || {};
+  let gps = activity.gps || {};
   newDiv.innerHTML = '<h3><span class="check"></span>Activity started on '
                       + dateFormat(startDate, 'dd mm yyyy')
                       + ' at '
-                      + dateFormat(startDate, 'HH:MM') + ' </h3>';
-  newDiv.innerHTML += '<div class="info maxheartrate"><div class="label">'
-                      + 'average HR</div><div class="value">' 
-                      + activity.data.hr_average 
-                      + '<span>bpm</span></div></div>';
-  newDiv.innerHTML += '<div class="info minheartrate"><div class="label">' 
-                      + 'average speed</div><div class="value">' 
-                      + Math.round(activity.gps.avg_speed * 3.6 * 100) / 100 
-                      + '<span>km/h</span></div></div>';
-  newDiv.innerHTML += '<div class="info distance"><div class="label">' 
-                      + 'distance</div><div class="value">' 
-                      + Math.round((activity.gps.distance) / 10) / 100 
-                      + '<span>km</span></div></div>';
-  newDiv.innerHTML += '<div class="info calories"><div class="label">'
-                      + 'calories</div><div class="value">' 
-                      + Math.round(activity.data.manual_calories) 
-                      + '<span>kcal</span></div></div>';
+                      + dateFormat(startDate, 'HH:MM')
+                      + (activity.gps ? '' : ' (no GPS)')
+                      + ' </h3>';
+  newDiv.innerHTML += renderInfo('maxheartrate', 'average HR', data.hr_average, 'bpm', 1);
+  newDiv.innerHTML += renderInfo('minheartrate', 'average speed', gps.avg_speed, 'km/h', 3.6, 2);
+  newDiv.innerHTML += renderInfo('distance', 'distance', gps.distance, 'km', 1 / 1000, 2);
+  newDiv.innerHTML += renderInfo('calories', 'calories', data.manual_calories, 'kcal', 1);
   newDiv.dataset.activityId = activity.id;
   return newDiv;
+}
+
+/**
+ * generates one value block of an activity card, "-" if the value is missing
+ * @param {string} className css class of the block
+ * @param {string} label the label shown above the value
+ * @param {number} value the raw value, can be undefined or null
+ * @param {string} unit the unit shown after the value
+ * @param {number} factor the value is multiplied by this factor
+ * @param {int} decimals number of decimals, 0 if not given
+ * @return {string} HTML of the block
+ */
+function renderInfo(className, label, value, unit, factor, decimals) {
+  var shown = '-';
+  if (typeof value === 'number' && isFinite(value)) {
+    var multiplier = Math.pow(10, decimals || 0);
+    shown = Math.round(value * factor * multiplier) / multiplier;
+  }
+  return '<div class="info ' + className + '"><div class="label">' + label
+          + '</div><div class="value">' + shown + '<span>' + unit + '</span></div></div>';
 }
 
 /**
@@ -284,6 +298,9 @@ function toggleSelection(id, range) {
  * @return {boolean} true if the activity has to be shown
  */
 function passesFilter(activity) {
+  if (!activity.gps && !showWithoutGps) {
+    return false;
+  }
   var startTime = activity.startdate * 1000;
   if (dateFrom && startTime < dateFrom.getTime()) {
     return false;
@@ -306,6 +323,15 @@ function passesFilter(activity) {
 function toggleDistanceFilter() {
   onlyWithDistance = !onlyWithDistance;
   document.getElementById('distanceFilterButton').classList.toggle('active', onlyWithDistance);
+  applyFilters();
+}
+
+/**
+ * Shows or hides the activities that have no GPS data at all (e.g. indoor workouts)
+ */
+function toggleNoGps() {
+  showWithoutGps = !showWithoutGps;
+  document.getElementById('noGpsButton').classList.toggle('active', showWithoutGps);
   applyFilters();
 }
 
